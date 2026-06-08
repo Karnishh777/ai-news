@@ -20,7 +20,7 @@ export const GET = route(async (req: NextRequest) => {
 
   // 1) Live results for the exact query (any topic / person / company).
   const live = await liveSearch(q, lang);
-  if (live.length) mergeIntoCache(lang, live); // so detail pages resolve
+  if (live.length) await mergeIntoCache(lang, live); // so detail pages resolve
 
   // 2) Local pool matches (already-loaded headlines).
   const pool = await getAllArticles(lang);
@@ -34,9 +34,28 @@ export const GET = route(async (req: NextRequest) => {
   for (const a of [...live, ...localMatches]) if (!byId.has(a.id)) byId.set(a.id, a);
   const results = rankTrending([...byId.values()]).slice(0, 40);
 
-  const suggestions = Array.from(
-    new Set(results.slice(0, 8).map((a) => a.title)),
-  ).slice(0, 6);
-
-  return ok({ results, suggestions, query: q, lang });
+  return ok({ results, suggestions: buildSuggestions(results, q), query: q, lang });
 });
+
+/** Concise "related searches" — frequent proper nouns from result titles. */
+function buildSuggestions(results: Article[], q: string): string[] {
+  const ql = q.toLowerCase();
+  const freq = new Map<string, number>();
+  for (const a of results.slice(0, 24)) {
+    const matches = a.title.match(/\b[A-Z][a-zA-Z0-9.]+(?:\s[A-Z][a-zA-Z0-9.]+){0,2}\b/g) ?? [];
+    for (const raw of matches) {
+      const m = raw.trim();
+      if (m.length < 3 || m.length > 26) continue;
+      if (m.toLowerCase() === ql || ql.includes(m.toLowerCase())) continue;
+      freq.set(m, (freq.get(m) ?? 0) + 1);
+    }
+  }
+  const top = [...freq.entries()].sort((a, b) => b[1] - a[1]).map((e) => e[0]);
+  // Fallback to tags (covers non-Latin scripts where capitalization doesn't apply).
+  if (top.length < 3) {
+    const tags = new Set<string>();
+    for (const a of results.slice(0, 12)) for (const t of a.tags) if (t !== "google news") tags.add(t);
+    return [...new Set([...top, ...tags])].slice(0, 6);
+  }
+  return top.slice(0, 8);
+}

@@ -286,6 +286,26 @@ const cache = new Map<Language, { at: number; data: Article[] }>();
 
 export const NEWS_TTL_MS = 10 * 60 * 1000;
 
+// Shared article pool in Redis (when configured) so that, on serverless, an
+// article fetched by one instance can be resolved (detail page) by another.
+import { Redis } from "@upstash/redis";
+
+const POOL_TTL_S = 900; // 15 minutes
+const POOL_MAX = 400; // cap stored articles to keep the value small
+
+function redisClient(): Redis | null {
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    try {
+      return Redis.fromEnv();
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+const poolKey = (lang: Language) => `nf:pool:${lang}`;
+
 /**
  * Selects the active news source for a language:
  *   - NEWSAPI_KEY set        -> NewsAPI.org
@@ -302,31 +322,65 @@ export async function getNewsProvider(lang: Language = "en"): Promise<NewsProvid
 export async function getAllArticles(lang: Language = "en"): Promise<Article[]> {
   const hit = cache.get(lang);
   if (hit && Date.now() - hit.at < NEWS_TTL_MS) return hit.data;
+
+  // Prefer the shared Redis pool (consistent ids across instances).
+  const r = redisClient();
+  if (r) {
+    try {
+      const pooled = await r.get<Article[]>(poolKey(lang));
+      if (pooled && pooled.length) {
+        cache.set(lang, { at: Date.now(), data: pooled });
+        return pooled;
+      }
+    } catch {
+      /* fall through to a fresh fetch */
+    }
+  }
+
   try {
     const provider = await getNewsProvider(lang);
     const data = await provider.fetchArticles();
     if (data.length === 0) throw new Error("provider returned no articles");
     cache.set(lang, { at: Date.now(), data });
+    if (r) {
+      try {
+        await r.set(poolKey(lang), data.slice(0, POOL_MAX), { ex: POOL_TTL_S });
+      } catch {
+        /* non-fatal */
+      }
+    }
     return data;
   } catch (err) {
     console.warn(`[news] live provider failed for "${lang}", falling back to mock:`, err);
     const data = await new MockNewsProvider().fetchArticles();
-    // Cache the fallback briefly so we retry the live source soon.
     cache.set(lang, { at: Date.now() - (NEWS_TTL_MS - 60_000), data });
     return data;
   }
 }
 
 /**
- * Merge ad-hoc articles (e.g. live search results) into a language's cache so
- * their detail pages resolve via getAllArticles() afterwards.
+ * Merge ad-hoc articles (e.g. live search / local results) into the language's
+ * caches so their detail pages resolve afterwards — both in-process and in the
+ * shared Redis pool (so any serverless instance can find them).
  */
-export function mergeIntoCache(lang: Language, articles: Article[]): void {
+export async function mergeIntoCache(lang: Language, articles: Article[]): Promise<void> {
   const hit = cache.get(lang);
   const base = hit?.data ?? [];
   const ids = new Set(base.map((a) => a.id));
-  const merged = [...base, ...articles.filter((a) => !ids.has(a.id))];
+  const merged = [...articles.filter((a) => !ids.has(a.id)), ...base].slice(0, POOL_MAX);
   cache.set(lang, { at: hit?.at ?? Date.now(), data: merged });
+
+  const r = redisClient();
+  if (r) {
+    try {
+      const pooled = (await r.get<Article[]>(poolKey(lang))) ?? [];
+      const pids = new Set(pooled.map((a) => a.id));
+      const pmerged = [...articles.filter((a) => !pids.has(a.id)), ...pooled].slice(0, POOL_MAX);
+      await r.set(poolKey(lang), pmerged, { ex: POOL_TTL_S });
+    } catch {
+      /* non-fatal */
+    }
+  }
 }
 
 /** Force the next getAllArticles() call to refetch. */

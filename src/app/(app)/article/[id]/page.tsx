@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -19,6 +18,7 @@ import { cn, timeAgo } from "@/lib/utils";
 import { getCategory } from "@/lib/news/categories";
 import { FactCheckBadge } from "@/components/ui/badge";
 import { NewsCard } from "@/components/NewsCard";
+import { ArticleImage } from "@/components/ArticleImage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUIStore, type TextSize } from "@/store/ui";
 import { track } from "@/lib/track";
@@ -183,7 +183,15 @@ export default function ArticlePage() {
 
       {/* Hero */}
       <div className="relative mt-6 aspect-[16/9] overflow-hidden rounded-2xl">
-        <Image src={article.imageUrl} alt={article.title} fill sizes="(max-width:768px) 100vw, 768px" className="object-cover" priority />
+        <ArticleImage
+          src={article.imageUrl}
+          category={article.category}
+          alt={article.title}
+          sizes="(max-width:768px) 100vw, 768px"
+          className="object-cover"
+          priority
+          emojiClass="text-7xl"
+        />
       </div>
 
       {/* AI Summary */}

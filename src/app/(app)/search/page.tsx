@@ -89,16 +89,19 @@ export default function SearchPage() {
         </div>
       ) : (
         suggestions.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {suggestions.map((s) => (
-              <button
-                key={s}
-                onClick={() => setQ(s)}
-                className="rounded-full bg-accent px-3 py-1.5 text-sm text-accent-foreground transition hover:brightness-110"
-              >
-                {s}
-              </button>
-            ))}
+          <div>
+            <p className="mb-2 text-sm font-medium text-muted-foreground">Related searches</p>
+            <div className="flex flex-wrap gap-2">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setQ(s)}
+                  className="rounded-full bg-accent px-3 py-1.5 text-sm text-accent-foreground transition hover:brightness-110"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
         )
       )}

@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -8,6 +7,7 @@ import type { Article } from "@/types";
 import { cn, timeAgo } from "@/lib/utils";
 import { getCategory } from "@/lib/news/categories";
 import { FactCheckBadge } from "@/components/ui/badge";
+import { ArticleImage } from "@/components/ArticleImage";
 import { track } from "@/lib/track";
 
 interface NewsCardProps {
@@ -60,7 +60,14 @@ export function NewsCard({ article, variant = "default", index = 0 }: NewsCardPr
         className="group flex gap-3 rounded-xl p-2 transition-colors hover:bg-accent/60"
       >
         <div className="relative size-16 shrink-0 overflow-hidden rounded-lg">
-          <Image src={article.imageUrl} alt="" fill sizes="64px" className="object-cover" />
+          <ArticleImage
+            src={article.imageUrl}
+            category={article.category}
+            alt={article.title}
+            sizes="64px"
+            className="object-cover"
+            emojiClass="text-xl"
+          />
         </div>
         <div className="min-w-0">
           <p className="line-clamp-2 text-sm font-medium leading-snug group-hover:text-primary">
@@ -89,10 +96,10 @@ export function NewsCard({ article, variant = "default", index = 0 }: NewsCardPr
     >
       <Link href={`/article/${article.id}`} onClick={onOpen} className="block">
         <div className={cn("relative overflow-hidden", isFeature ? "aspect-[16/9]" : "aspect-[16/10]")}>
-          <Image
+          <ArticleImage
             src={article.imageUrl}
+            category={article.category}
             alt={article.title}
-            fill
             sizes={isFeature ? "(max-width:768px) 100vw, 66vw" : "(max-width:768px) 100vw, 33vw"}
             className="object-cover transition-transform duration-500 group-hover:scale-105"
           />

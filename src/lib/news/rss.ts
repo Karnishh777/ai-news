@@ -259,7 +259,14 @@ function extractGuidLink(block: string): string {
 }
 
 function clean(s: string): string {
-  return decodeEntities(stripCdata(s).replace(/<[^>]+>/g, "")).trim();
+  // Order matters: Google News descriptions are HTML *encoded* inside the XML
+  // (e.g. "&lt;a href=…&gt;"). Decode first to reveal the tags, then strip
+  // them, then decode any remaining text entities.
+  let t = stripCdata(s);
+  t = decodeEntities(t);
+  t = t.replace(/<[^>]+>/g, " ");
+  t = decodeEntities(t);
+  return t.replace(/\s+/g, " ").trim();
 }
 
 function stripCdata(s: string): string {
@@ -278,7 +285,10 @@ function decodeEntities(s: string): string {
     .replace(/&nbsp;/g, " ");
 }
 
-function safeImage(url: string | null, seed: string): string {
+// Returns a real image URL only if it's from an allowed host. Otherwise
+// returns "" — the UI then shows a clean category-themed placeholder instead
+// of a random, unrelated stock photo.
+function safeImage(url: string | null): string {
   if (url) {
     try {
       const host = new URL(url).hostname;
@@ -287,7 +297,7 @@ function safeImage(url: string | null, seed: string): string {
       /* fall through */
     }
   }
-  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/800/500`;
+  return "";
 }
 
 function hash(s: string): string {
@@ -321,7 +331,7 @@ function toArticle(item: RssItem, feed: FeedDef, idx: number): Article {
     slug: slugify(title) || id,
     category: feed.category,
     source: { id: slugify(source), name: source, credibility: feed.credibility },
-    imageUrl: safeImage(item.image, id),
+    imageUrl: safeImage(item.image),
     url: item.link,
     publishedAt,
     summary,

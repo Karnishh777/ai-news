@@ -38,7 +38,7 @@ export const GET = route(async (req: NextRequest) => {
     const loc = (user?.preferences.location ?? "").trim();
     const query = loc ? `${loc} news` : "local news today";
     articles = await liveSearch(query, prefs.language, "local");
-    if (articles.length) mergeIntoCache(prefs.language, articles); // so detail pages resolve
+    if (articles.length) await mergeIntoCache(prefs.language, articles); // so detail pages resolve
   } else {
     articles = await getAllArticles(prefs.language);
     if (category) articles = articles.filter((a) => a.category === category);
@@ -59,7 +59,7 @@ export const GET = route(async (req: NextRequest) => {
       const loc = (user?.preferences.location ?? "").trim();
       const localArts = await liveSearch(loc ? `${loc} news` : "local news today", prefs.language, "local");
       if (localArts.length) {
-        mergeIntoCache(prefs.language, localArts);
+        await mergeIntoCache(prefs.language, localArts);
         const idx = sections.findIndex((s) => s.category === "local");
         const entry = { category: "local", articles: localArts.slice(0, 8) };
         if (idx >= 0) sections[idx] = entry;

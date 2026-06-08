@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { Radio, X } from "lucide-react";
+import { ArticleImage } from "@/components/ArticleImage";
+import type { CategorySlug } from "@/types";
 
 interface BreakingEvent {
   id: string;
@@ -70,7 +71,14 @@ export function BreakingNewsToast() {
               className="glass-strong flex items-center gap-3 rounded-2xl border-l-4 border-l-destructive p-3 shadow-glow"
             >
               <div className="relative size-14 shrink-0 overflow-hidden rounded-xl">
-                <Image src={event.imageUrl} alt="" fill sizes="56px" className="object-cover" />
+                <ArticleImage
+                  src={event.imageUrl}
+                  category={event.category as CategorySlug}
+                  alt={event.title}
+                  sizes="56px"
+                  className="object-cover"
+                  emojiClass="text-2xl"
+                />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-destructive">

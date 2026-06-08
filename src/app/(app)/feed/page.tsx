@@ -68,12 +68,12 @@ export default function FeedPage() {
     [active],
   );
 
-  // Reload when the category changes (and on first mount).
+  // Reload when the category — or the user's language — changes.
   useEffect(() => {
     loadTop();
     loadFeed(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
+  }, [active, user?.preferences.language]);
 
   // Manual + automatic refresh
   const refresh = useCallback(async () => {

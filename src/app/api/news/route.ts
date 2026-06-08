@@ -31,7 +31,7 @@ export const GET = route(async (req: NextRequest) => {
   const interactions = user ? await interactionsForUser(user.id) : [];
   const seen = new Set(user ? await historyForUser(user.id) : []);
 
-  let articles = await getAllArticles();
+  let articles = await getAllArticles(prefs.language);
   if (category) articles = articles.filter((a) => a.category === category);
 
   const ranked = rankArticles(articles, { prefs, interactions, seenArticleIds: seen });

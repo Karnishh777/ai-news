@@ -17,6 +17,7 @@ import { useUserStore } from "@/store/user";
 import { ThemeToggle } from "./ThemeToggle";
 import { NotificationsBell } from "./NotificationsBell";
 import { BreakingNewsToast } from "./BreakingNewsToast";
+import { AssistantWidget } from "./AssistantWidget";
 
 const NAV = [
   { href: "/feed", label: "Home", icon: Home },
@@ -159,6 +160,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
 
       <BreakingNewsToast />
+      <AssistantWidget />
     </div>
   );
 }

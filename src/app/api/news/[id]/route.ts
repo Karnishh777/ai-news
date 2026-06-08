@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
 import { route, ok, fail } from "@/lib/api";
+import { getSession } from "@/lib/auth";
+import { findUserById } from "@/lib/db";
 import { getAllArticles } from "@/lib/news/provider";
 import { rankArticles } from "@/lib/personalization";
 
@@ -8,7 +10,10 @@ export const runtime = "nodejs";
 export const GET = route(
   async (_req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
     const { id } = await ctx.params;
-    const articles = await getAllArticles();
+    const session = await getSession();
+    const user = session ? await findUserById(session.userId) : null;
+    const lang = user?.preferences.language ?? "en";
+    const articles = await getAllArticles(lang);
     const article = articles.find((a) => a.id === id || a.slug === id);
     if (!article) return fail("Article not found", 404);
 

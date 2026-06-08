@@ -1,4 +1,4 @@
-import type { Article, CategorySlug, FactCheckStatus, Source } from "@/types";
+import type { Article, CategorySlug, FactCheckStatus, Language, Source } from "@/types";
 import { CATEGORIES } from "./categories";
 import { mulberry32, readingTime, slugify } from "@/lib/utils";
 
@@ -281,42 +281,55 @@ function normalizeNewsApi(a: RawNewsApiArticle): Article {
   };
 }
 
-let cached: { at: number; data: Article[] } | null = null;
+// Per-language in-process cache (refreshes every 10 minutes).
+const cache = new Map<Language, { at: number; data: Article[] }>();
 
-// News refreshes every 10 minutes (server-side cache window).
 export const NEWS_TTL_MS = 10 * 60 * 1000;
 
 /**
- * Selects the active news source:
+ * Selects the active news source for a language:
  *   - NEWSAPI_KEY set        -> NewsAPI.org
  *   - NEWS_SOURCE === "mock" -> deterministic mock generator (offline-safe)
  *   - default                -> live RSS multi-source aggregation
  */
-export async function getNewsProvider(): Promise<NewsProvider> {
+export async function getNewsProvider(lang: Language = "en"): Promise<NewsProvider> {
   if (process.env.NEWSAPI_KEY) return new NewsApiProvider(process.env.NEWSAPI_KEY);
   if ((process.env.NEWS_SOURCE ?? "rss").toLowerCase() === "mock") return new MockNewsProvider();
   const { RssProvider } = await import("./rss");
-  return new RssProvider();
+  return RssProvider.forLanguage(lang);
 }
 
-export async function getAllArticles(): Promise<Article[]> {
-  if (cached && Date.now() - cached.at < NEWS_TTL_MS) return cached.data;
+export async function getAllArticles(lang: Language = "en"): Promise<Article[]> {
+  const hit = cache.get(lang);
+  if (hit && Date.now() - hit.at < NEWS_TTL_MS) return hit.data;
   try {
-    const provider = await getNewsProvider();
+    const provider = await getNewsProvider(lang);
     const data = await provider.fetchArticles();
     if (data.length === 0) throw new Error("provider returned no articles");
-    cached = { at: Date.now(), data };
+    cache.set(lang, { at: Date.now(), data });
     return data;
   } catch (err) {
-    console.warn("[news] live provider failed, falling back to mock:", err);
+    console.warn(`[news] live provider failed for "${lang}", falling back to mock:`, err);
     const data = await new MockNewsProvider().fetchArticles();
     // Cache the fallback briefly so we retry the live source soon.
-    cached = { at: Date.now() - (NEWS_TTL_MS - 60_000), data };
+    cache.set(lang, { at: Date.now() - (NEWS_TTL_MS - 60_000), data });
     return data;
   }
 }
 
-/** Force the next getAllArticles() call to refetch (used by manual refresh). */
+/**
+ * Merge ad-hoc articles (e.g. live search results) into a language's cache so
+ * their detail pages resolve via getAllArticles() afterwards.
+ */
+export function mergeIntoCache(lang: Language, articles: Article[]): void {
+  const hit = cache.get(lang);
+  const base = hit?.data ?? [];
+  const ids = new Set(base.map((a) => a.id));
+  const merged = [...base, ...articles.filter((a) => !ids.has(a.id))];
+  cache.set(lang, { at: hit?.at ?? Date.now(), data: merged });
+}
+
+/** Force the next getAllArticles() call to refetch. */
 export function invalidateNewsCache(): void {
-  cached = null;
+  cache.clear();
 }

@@ -1,41 +1,42 @@
 import { NextRequest } from "next/server";
 import { route, ok } from "@/lib/api";
-import { getAllArticles } from "@/lib/news/provider";
+import { getSession } from "@/lib/auth";
+import { findUserById } from "@/lib/db";
+import { getAllArticles, mergeIntoCache } from "@/lib/news/provider";
+import { liveSearch } from "@/lib/news/rss";
 import { rankTrending } from "@/lib/personalization";
+import type { Article } from "@/types";
 
 export const runtime = "nodejs";
 
 export const GET = route(async (req: NextRequest) => {
-  const q = (new URL(req.url).searchParams.get("q") ?? "").trim().toLowerCase();
+  const q = (new URL(req.url).searchParams.get("q") ?? "").trim();
   if (q.length < 2) return ok({ results: [], suggestions: [] });
 
-  const articles = await getAllArticles();
-  const terms = q.split(/\s+/);
+  const session = await getSession();
+  const user = session ? await findUserById(session.userId) : null;
+  const lang = user?.preferences.language ?? "en";
+  const terms = q.toLowerCase().split(/\s+/);
 
-  const scored = articles
-    .map((a) => {
-      const haystack = `${a.title} ${a.summary} ${a.tags.join(" ")} ${a.source.name} ${a.category}`.toLowerCase();
-      let score = 0;
-      for (const t of terms) {
-        if (a.title.toLowerCase().includes(t)) score += 5;
-        else if (haystack.includes(t)) score += 2;
-      }
-      return { a, score };
-    })
-    .filter((s) => s.score > 0)
-    .sort((x, y) => y.score - x.score);
+  // 1) Live results for the exact query (any topic / person / company).
+  const live = await liveSearch(q, lang);
+  if (live.length) mergeIntoCache(lang, live); // so detail pages resolve
 
-  const results = rankTrending(scored.map((s) => s.a)).slice(0, 30);
+  // 2) Local pool matches (already-loaded headlines).
+  const pool = await getAllArticles(lang);
+  const localMatches = pool.filter((a) => {
+    const hay = `${a.title} ${a.summary} ${a.tags.join(" ")} ${a.source.name} ${a.category}`.toLowerCase();
+    return terms.some((t) => hay.includes(t));
+  });
 
-  // Instant suggestions from the top matches' titles + tags.
+  // 3) Merge, de-dupe by id, rank by recency/relevance.
+  const byId = new Map<string, Article>();
+  for (const a of [...live, ...localMatches]) if (!byId.has(a.id)) byId.set(a.id, a);
+  const results = rankTrending([...byId.values()]).slice(0, 40);
+
   const suggestions = Array.from(
-    new Set(
-      scored
-        .slice(0, 8)
-        .flatMap((s) => [s.a.title, ...s.a.tags])
-        .filter((x) => x.toLowerCase().includes(terms[0])),
-    ),
+    new Set(results.slice(0, 8).map((a) => a.title)),
   ).slice(0, 6);
 
-  return ok({ results, suggestions });
+  return ok({ results, suggestions, query: q, lang });
 });

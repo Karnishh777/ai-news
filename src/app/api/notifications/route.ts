@@ -22,7 +22,7 @@ export const GET = route(async () => {
   const existingArticleIds = new Set(existing.map((n) => n.articleId));
   const interests = new Set(user?.preferences.interests ?? []);
 
-  const articles = await getAllArticles();
+  const articles = await getAllArticles(user?.preferences.language ?? "en");
   const candidates = rankTrending(
     articles.filter((a) => (a.breaking || a.trendingScore > 80) && (interests.size === 0 || interests.has(a.category))),
   ).slice(0, 6);

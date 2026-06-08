@@ -65,15 +65,22 @@ export function rankArticles(articles: Article[], opts: RankOptions): Article[] 
   const affinity = buildAffinity(opts.prefs, opts.interactions);
   const seen = opts.seenArticleIds ?? new Set();
   const lang = opts.prefs.language;
+  const interestSet = new Set(opts.prefs.interests);
 
   const scored = articles.map((a) => {
     const aff = affinity[a.category] ?? 0;
+    // Strong membership bonus so the feed is clearly built around the user's
+    // chosen interests; recency/trending then order articles *within* them.
+    // Non-interest stories sink below all interest stories (they still appear
+    // further down the page for discovery).
+    const inInterest = interestSet.size > 0 && interestSet.has(a.category) ? 50 : 0;
     const score =
-      aff * 1.6 +
-      recencyScore(a.publishedAt) * 22 +
-      (a.trendingScore / 100) * 14 +
-      (a.source.credibility / 100) * 6 +
-      (a.breaking ? 8 : 0) +
+      inInterest +
+      aff * 2 +
+      recencyScore(a.publishedAt) * 18 +
+      (a.trendingScore / 100) * 12 +
+      (a.source.credibility / 100) * 5 +
+      (a.breaking ? 6 : 0) +
       (a.language === lang ? 3 : 0) -
       (seen.has(a.id) ? 18 : 0);
     return { a, score };

@@ -164,7 +164,11 @@ export class RssProvider implements NewsProvider {
 }
 
 /** Live search across Google News for any query, in the user's language. */
-export async function liveSearch(query: string, lang: Language = "en"): Promise<Article[]> {
+export async function liveSearch(
+  query: string,
+  lang: Language = "en",
+  category: CategorySlug = "world",
+): Promise<Article[]> {
   const url = gnewsSearch(query, lang);
   try {
     const res = await fetch(url, {
@@ -173,7 +177,7 @@ export async function liveSearch(query: string, lang: Language = "en"): Promise<
     });
     if (!res.ok) return [];
     const xml = await res.text();
-    const feed: FeedDef = { url, category: "world", source: "Google News", credibility: 80, lang };
+    const feed: FeedDef = { url, category, source: "Google News", credibility: 80, lang };
     return dedupe(parseRssItems(xml).slice(0, 30).map((it, i) => toArticle(it, feed, i)));
   } catch {
     return [];

@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import { route, ok } from "@/lib/api";
 import { getSession } from "@/lib/auth";
-import { getAllArticles } from "@/lib/news/provider";
+import { getAllArticles, mergeIntoCache } from "@/lib/news/provider";
+import { liveSearch } from "@/lib/news/rss";
 import { interactionsForUser, findUserById, historyForUser } from "@/lib/db";
 import { groupByCategory, rankArticles } from "@/lib/personalization";
-import type { CategorySlug, UserPreferences } from "@/types";
+import type { Article, CategorySlug, UserPreferences } from "@/types";
 import { CATEGORIES } from "@/lib/news/categories";
 import { ensureSeeded } from "@/lib/seed-memory";
 
@@ -31,8 +32,17 @@ export const GET = route(async (req: NextRequest) => {
   const interactions = user ? await interactionsForUser(user.id) : [];
   const seen = new Set(user ? await historyForUser(user.id) : []);
 
-  let articles = await getAllArticles(prefs.language);
-  if (category) articles = articles.filter((a) => a.category === category);
+  let articles: Article[];
+  if (category === "local") {
+    // Local news is driven by the user's saved location (not a generic feed).
+    const loc = (user?.preferences.location ?? "").trim();
+    const query = loc ? `${loc} news` : "local news today";
+    articles = await liveSearch(query, prefs.language, "local");
+    if (articles.length) mergeIntoCache(prefs.language, articles); // so detail pages resolve
+  } else {
+    articles = await getAllArticles(prefs.language);
+    if (category) articles = articles.filter((a) => a.category === category);
+  }
 
   const ranked = rankArticles(articles, { prefs, interactions, seenArticleIds: seen });
 
@@ -43,6 +53,20 @@ export const GET = route(async (req: NextRequest) => {
       category: slug,
       articles: items.slice(0, 8),
     }));
+
+    // Replace the "local" rail with real location-based news when relevant.
+    if (order.includes("local")) {
+      const loc = (user?.preferences.location ?? "").trim();
+      const localArts = await liveSearch(loc ? `${loc} news` : "local news today", prefs.language, "local");
+      if (localArts.length) {
+        mergeIntoCache(prefs.language, localArts);
+        const idx = sections.findIndex((s) => s.category === "local");
+        const entry = { category: "local", articles: localArts.slice(0, 8) };
+        if (idx >= 0) sections[idx] = entry;
+        else sections.push(entry);
+      }
+    }
+
     return ok({ sections });
   }
 

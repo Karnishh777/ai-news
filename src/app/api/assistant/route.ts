@@ -40,20 +40,70 @@ export const POST = route(async (req: NextRequest) => {
       const reply = await askGemini(key, messages, headlines);
       return ok({ reply, source: "gemini", aiEnabled: true });
     } catch (err) {
-      console.error("[assistant] Gemini failed, using built-in helper:", err);
-      const reply = await builtin(last, lang);
-      return ok({ reply, source: "builtin", aiEnabled: false, note: "AI key failed — using the built-in guide." });
+      const ge = err as GeminiError;
+      console.error("[assistant] Gemini failed:", ge.status, ge.message);
+      const fromUser = Boolean(body.apiKey);
+      const invalidKey =
+        ge.status === 401 || ge.status === 403 || (ge.status === 400 && /api[_ ]?key|not valid/i.test(ge.message));
+      const note = invalidKey
+        ? fromUser
+          ? "⚠️ That API key was rejected — double-check it and try again."
+          : "⚠️ The server's Gemini key was rejected. An admin should verify GEMINI_API_KEY in Netlify."
+        : "⚠️ The AI service is busy right now — here's the quick guide meanwhile.";
+      const guide = await builtin(last, lang, true);
+      return ok({
+        reply: `${note}\n\n${guide}`,
+        source: "builtin",
+        aiEnabled: false,
+        error: invalidKey ? "invalid_key" : "unavailable",
+      });
     }
   }
 
-  const reply = await builtin(last, lang);
+  const reply = await builtin(last, lang, false);
   return ok({ reply, source: "builtin", aiEnabled: false });
 });
 
 // ── Gemini ──
 
+class GeminiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = "GeminiError";
+  }
+}
+
+// Tries the configured model, then known-good fallbacks (model names drift
+// between releases, so this keeps the chatbot working without redeploys).
+const FALLBACK_MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-flash-latest"];
+
 async function askGemini(key: string, messages: ChatMessage[], headlines: string): Promise<string> {
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const primary = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const models = [primary, ...FALLBACK_MODELS.filter((m) => m !== primary)];
+  let lastErr: GeminiError = new GeminiError(0, "no models tried");
+
+  for (const model of models) {
+    try {
+      return await callGemini(model, key, messages, headlines);
+    } catch (e) {
+      const ge = e as GeminiError;
+      lastErr = ge;
+      // A bad key / auth error won't be fixed by another model — stop early.
+      if (ge.status === 401 || ge.status === 403 || (ge.status === 400 && /api[_ ]?key|not valid/i.test(ge.message))) {
+        throw ge;
+      }
+      // Otherwise (404 model-not-found, 429, 5xx) try the next model.
+    }
+  }
+  throw lastErr;
+}
+
+async function callGemini(
+  model: string,
+  key: string,
+  messages: ChatMessage[],
+  headlines: string,
+): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const contents = messages.map((m) => ({
     role: m.role === "assistant" ? "model" : "user",
@@ -70,10 +120,10 @@ async function askGemini(key: string, messages: ChatMessage[], headlines: string
       generationConfig: { temperature: 0.6, maxOutputTokens: 700 },
     }),
   });
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text().catch(() => "")}`);
+  if (!res.ok) throw new GeminiError(res.status, await res.text().catch(() => ""));
   const data = await res.json();
   const text = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text).join("") ?? "";
-  if (!text.trim()) throw new Error("Empty Gemini response");
+  if (!text.trim()) throw new GeminiError(0, "Empty Gemini response");
   return text.trim();
 }
 
@@ -88,7 +138,7 @@ async function topHeadlines(lang: Language): Promise<string> {
 
 // ── Built-in helper (no key required) ──
 
-async function builtin(message: string, lang: Language): Promise<string> {
+async function builtin(message: string, lang: Language, aiConfigured = false): Promise<string> {
   const m = message.toLowerCase();
   const has = (...k: string[]) => k.some((x) => m.includes(x));
 
@@ -130,6 +180,14 @@ async function builtin(message: string, lang: Language): Promise<string> {
     ].join("\n");
   }
   if (has("api key", "gemini", "enable ai", "openai", "chatbot ai", "real ai", "smarter")) {
+    if (aiConfigured) {
+      return [
+        "AI is configured here ✅ — if answers aren't coming through, the key or model may be the issue:",
+        "• Verify `GEMINI_API_KEY` is valid (aistudio.google.com).",
+        "• Set `GEMINI_MODEL` to a current model (e.g. `gemini-2.0-flash`).",
+        "• Make sure you redeployed after adding the variable.",
+      ].join("\n");
+    }
     return [
       "Want real AI answers? Add a **free Gemini key**:",
       "1. Get one at **aistudio.google.com → Get API key**.",
@@ -152,11 +210,12 @@ async function builtin(message: string, lang: Language): Promise<string> {
   }
 
   // Fallback
-  return [
+  const lines = [
     "I can help you use NewsFlow — features, themes, language, bookmarks, search, deploying, or adding a database.",
-    "For AI answers about **any topic**, add a free Gemini key with the 🔑 icon above.",
-    "Try: *“what's trending?”*, *“change language”*, or *“how do I deploy?”*",
-  ].join("\n");
+  ];
+  if (!aiConfigured) lines.push("For AI answers about **any topic**, add a free Gemini key with the 🔑 icon above.");
+  lines.push("Try: *“what's trending?”*, *“change language”*, or *“how do I deploy?”*");
+  return lines.join("\n");
 }
 
 function extractTopic(message: string): string {

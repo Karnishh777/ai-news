@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: newsflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: newsflow
+      POSTGRES_PASSWORD: newsflow
+      POSTGRES_DB: newsflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - newsflow_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newsflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: newsflow-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - newsflow_redis:/data
+
+volumes:
+  newsflow_pg:
+  newsflow_redis:

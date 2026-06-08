@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"=== tsc exit: $? ===\")",
+      "Bash(echo \"tsc exit: $?\")",
+      "Bash(npm run *)",
+      "Bash(echo \"build exit: $?\")",
+      "Read(//tmp/**)",
+      "Bash(rm -f /tmp/nf_dev*.log /tmp/nf_build.log)"
+    ]
+  }
+}

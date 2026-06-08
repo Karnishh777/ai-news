@@ -1,0 +1,12 @@
+# Netlify configuration for NewsFlow AI (Next.js 15)
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Official Next.js runtime: enables App Router, API routes, middleware,
+# and Image Optimization as serverless/edge functions.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

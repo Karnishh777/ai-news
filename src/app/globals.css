@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 33% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --primary: 256 90% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 256 90% 96%;
+    --accent-foreground: 256 90% 40%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 256 90% 60%;
+    --radius: 0.9rem;
+    /* themeable accent gradient (overridden by [data-theme]) */
+    --grad-from: 256 90% 60%;
+    --grad-to: 292 84% 58%;
+  }
+
+  /* ── Category-inspired themes (set via data-theme on <html>) ── */
+  [data-theme="playstation"] { --primary: 211 100% 45%; --ring: 211 100% 45%; --grad-from: 211 100% 45%; --grad-to: 199 95% 50%; }
+  [data-theme="neon"]        { --primary: 318 90% 58%; --ring: 318 90% 58%; --grad-from: 318 90% 58%; --grad-to: 190 95% 55%; }
+  [data-theme="emerald"]     { --primary: 152 70% 40%; --ring: 152 70% 40%; --grad-from: 152 70% 42%; --grad-to: 168 76% 44%; }
+  [data-theme="sunset"]      { --primary: 12 90% 56%;  --ring: 12 90% 56%;  --grad-from: 12 90% 58%;  --grad-to: 330 85% 60%; }
+  [data-theme="crimson"]     { --primary: 0 80% 55%;   --ring: 0 80% 55%;   --grad-from: 0 80% 56%;   --grad-to: 28 92% 55%; }
+  [data-theme="ocean"]       { --primary: 199 90% 46%; --ring: 199 90% 46%; --grad-from: 199 90% 48%; --grad-to: 221 84% 56%; }
+  [data-theme="forest"]      { --primary: 142 58% 38%; --ring: 142 58% 38%; --grad-from: 142 58% 40%; --grad-to: 96 60% 45%; }
+  [data-theme="gold"]        { --primary: 38 92% 48%;  --ring: 38 92% 48%;  --grad-from: 38 92% 50%;  --grad-to: 12 86% 55%; }
+
+  .dark {
+    --background: 224 47% 6%;
+    --foreground: 210 40% 98%;
+    --card: 224 39% 9%;
+    --card-foreground: 210 40% 98%;
+    --primary: 256 92% 68%;
+    --primary-foreground: 224 47% 6%;
+    --secondary: 223 30% 16%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 223 30% 14%;
+    --muted-foreground: 217 15% 65%;
+    --accent: 256 50% 20%;
+    --accent-foreground: 256 90% 85%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 223 25% 18%;
+    --input: 223 25% 18%;
+    --ring: 256 92% 68%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Ambient gradient backdrop for the whole app */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(60rem 60rem at 10% -10%, hsl(var(--primary) / 0.12), transparent 60%),
+      radial-gradient(50rem 50rem at 110% 10%, hsl(280 90% 60% / 0.1), transparent 55%),
+      radial-gradient(40rem 40rem at 50% 120%, hsl(190 90% 55% / 0.08), transparent 60%);
+  }
+}
+
+@layer components {
+  .glass {
+    @apply border border-white/10 bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-white/5;
+  }
+
+  .glass-strong {
+    @apply border border-white/20 bg-white/80 backdrop-blur-2xl dark:border-white/10 dark:bg-card/70;
+  }
+
+  .gradient-text {
+    background-image: linear-gradient(to right, hsl(var(--grad-from)), hsl(var(--grad-to)));
+    @apply bg-clip-text text-transparent;
+  }
+
+  .gradient-primary {
+    background-image: linear-gradient(to bottom right, hsl(var(--grad-from)), hsl(var(--grad-to)));
+  }
+
+  .focus-ring {
+    @apply outline-none ring-offset-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  /* Skeleton shimmer */
+  .shimmer {
+    @apply relative overflow-hidden bg-muted;
+  }
+  .shimmer::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--foreground) / 0.06),
+      transparent
+    );
+    animation: shimmer 1.6s infinite;
+  }
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* Hide scrollbars on horizontal rails */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}

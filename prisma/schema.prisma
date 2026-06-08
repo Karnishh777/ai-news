@@ -1,0 +1,197 @@
+// NewsFlow AI — PostgreSQL schema (production data layer)
+//
+// The app ships with an in-memory store mirroring these models so it runs
+// with zero setup. To go to Postgres: set DATA_DRIVER=prisma + DATABASE_URL,
+// run `npx prisma migrate dev`, then `npm run db:seed`, and swap the bodies
+// of src/lib/db.ts for Prisma calls (the call sites are already aligned).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  user
+  admin
+}
+
+enum Language {
+  en
+  ta
+  hi
+  te
+  ml
+  kn
+}
+
+enum NewsLength {
+  headlines
+  short
+  detailed
+}
+
+enum NotificationPref {
+  breaking
+  digest
+  both
+}
+
+enum FactCheckStatus {
+  verified
+  developing
+  opinion
+  unverified
+}
+
+enum InteractionType {
+  click
+  like
+  share
+  save
+  view
+  read_time
+  category_open
+}
+
+enum NotificationType {
+  breaking
+  digest
+  personalized
+}
+
+model User {
+  id            String           @id @default(cuid())
+  fullName      String
+  email         String           @unique
+  passwordHash  String
+  role          Role             @default(user)
+  emailVerified Boolean          @default(false)
+  onboarded     Boolean          @default(false)
+
+  // Preferences
+  interests     String[]         @default([])
+  language      Language         @default(en)
+  newsLength    NewsLength       @default(short)
+  notification  NotificationPref @default(both)
+  location      String?
+
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  interactions  Interaction[]
+  bookmarks     Bookmark[]
+  notifications Notification[]
+  history       ReadingHistory[]
+
+  @@index([email])
+}
+
+model OtpToken {
+  id           String   @id @default(cuid())
+  email        String
+  codeHash     String
+  // Pending account data, finalized on verification
+  fullName     String
+  passwordHash String
+  attempts     Int      @default(0)
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([email])
+}
+
+model Source {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  logo        String?
+  credibility Int       @default(80)
+  articles    Article[]
+}
+
+model Article {
+  id             String           @id @default(cuid())
+  title          String
+  slug           String           @unique
+  category       String
+  sourceId       String
+  source         Source           @relation(fields: [sourceId], references: [id])
+  author         String?
+  imageUrl       String
+  url            String
+  summary        String
+  content        String
+  takeaways      String[]
+  quickRead      String
+  factCheck      FactCheckStatus  @default(unverified)
+  readingTimeMin Int              @default(1)
+  tags           String[]         @default([])
+  trendingScore  Int              @default(50)
+  breaking       Boolean          @default(false)
+  language       Language         @default(en)
+  publishedAt    DateTime
+  createdAt      DateTime         @default(now())
+
+  interactions   Interaction[]
+  bookmarks      Bookmark[]
+  history        ReadingHistory[]
+
+  @@index([category])
+  @@index([publishedAt])
+  @@index([trendingScore])
+}
+
+model Interaction {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  articleId String?
+  article   Article?        @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  category  String?
+  type      InteractionType
+  value     Int?
+  createdAt DateTime        @default(now())
+
+  @@index([userId])
+  @@index([userId, category])
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, articleId])
+  @@index([userId])
+}
+
+model ReadingHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  viewedAt  DateTime @default(now())
+
+  @@index([userId, viewedAt])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  articleId String?
+  type      NotificationType @default(personalized)
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read])
+}

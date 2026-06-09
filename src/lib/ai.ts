@@ -1,4 +1,5 @@
 import "server-only";
+import { env } from "./env";
 
 // ─────────────────────────────────────────────────────────────
 // Shared Gemini client (used by the chatbot + article AI tools + briefing).
@@ -20,11 +21,12 @@ export interface GeminiContent {
 const FALLBACK_MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-flash-latest"];
 
 export function hasServerKey(): boolean {
-  return Boolean(process.env.GEMINI_API_KEY);
+  return Boolean(env("GEMINI_API_KEY"));
 }
 
 export function resolveKey(userKey?: string): string {
-  return (userKey || process.env.GEMINI_API_KEY || "").trim();
+  const u = (userKey ?? "").trim();
+  return u || env("GEMINI_API_KEY");
 }
 
 export function userTurn(prompt: string): GeminiContent[] {
@@ -37,7 +39,7 @@ export async function geminiChat(
   contents: GeminiContent[],
   maxOutputTokens = 700,
 ): Promise<string> {
-  const primary = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const primary = env("GEMINI_MODEL") || "gemini-2.0-flash";
   const models = [primary, ...FALLBACK_MODELS.filter((m) => m !== primary)];
   let lastErr: GeminiError = new GeminiError(0, "no models tried");
 

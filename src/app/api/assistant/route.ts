@@ -6,7 +6,7 @@ import { getAllArticles } from "@/lib/news/provider";
 import { liveSearch } from "@/lib/news/rss";
 import { rankTrending } from "@/lib/personalization";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
-import { GeminiError, geminiChat } from "@/lib/ai";
+import { GeminiError, geminiChat, resolveKey } from "@/lib/ai";
 import type { Article, Language } from "@/types";
 
 export const runtime = "nodejs";
@@ -33,7 +33,7 @@ export const POST = route(async (req: NextRequest) => {
   const lang: Language = user?.preferences.language ?? "en";
   const last = messages[messages.length - 1].content.trim();
 
-  const key = (body.apiKey || process.env.GEMINI_API_KEY || "").trim();
+  const key = resolveKey(body.apiKey);
 
   if (key) {
     try {

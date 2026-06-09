@@ -1,4 +1,5 @@
 import "server-only";
+import { env } from "./env";
 
 // ─────────────────────────────────────────────────────────────
 // Email OTP
@@ -16,24 +17,24 @@ import "server-only";
 export const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 export const MAX_OTP_ATTEMPTS = 5;
 
-const FROM = process.env.EMAIL_FROM || "NewsFlow AI <onboarding@resend.dev>";
+const fromAddress = () => env("EMAIL_FROM") || "NewsFlow AI <onboarding@resend.dev>";
 
 export function generateOtp(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 export function hasEmailProvider(): boolean {
-  return Boolean(process.env.RESEND_API_KEY || (process.env.SMTP_HOST && process.env.SMTP_USER));
+  return Boolean(env("RESEND_API_KEY") || (env("SMTP_HOST") && env("SMTP_USER")));
 }
 
 export async function sendOtpEmail(email: string, code: string): Promise<void> {
   const subject = "Your NewsFlow AI verification code";
 
-  if (process.env.RESEND_API_KEY) {
+  if (env("RESEND_API_KEY")) {
     await deliverViaResend(email, subject, code);
     return;
   }
-  if (process.env.SMTP_HOST && process.env.SMTP_USER) {
+  if (env("SMTP_HOST") && env("SMTP_USER")) {
     await deliverViaSmtp(email, subject, code);
     return;
   }
@@ -46,11 +47,11 @@ async function deliverViaResend(to: string, subject: string, code: string): Prom
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      Authorization: `Bearer ${env("RESEND_API_KEY")}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: FROM,
+      from: fromAddress(),
       to: [to],
       subject,
       html: otpEmailHtml(code),

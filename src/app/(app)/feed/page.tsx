@@ -1,10 +1,12 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2, ChevronRight, RefreshCw } from "lucide-react";
+import { Loader2, ChevronRight, RefreshCw, Zap } from "lucide-react";
 import type { Article, CategorySlug } from "@/types";
 import { NewsCard } from "@/components/NewsCard";
 import { TrendingRail } from "@/components/TrendingRail";
+import { TrendingTicker } from "@/components/TrendingTicker";
+import { DailyBriefing } from "@/components/DailyBriefing";
 import { CategoryChips } from "@/components/CategoryChips";
 import { NewsCardSkeleton } from "@/components/ui/skeleton";
 import { getCategory } from "@/lib/news/categories";
@@ -124,6 +126,9 @@ export default function FeedPage() {
 
   return (
     <div className="space-y-8">
+      {/* Live trending ticker */}
+      <TrendingTicker />
+
       {/* Greeting */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -132,16 +137,29 @@ export default function FeedPage() {
           </h1>
           <p className="mt-1 text-muted-foreground">Here&apos;s what&apos;s happening, tuned to you.</p>
         </div>
-        <button
-          onClick={refresh}
-          disabled={refreshing}
-          className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-60"
-          title="Auto-updates every 10 minutes"
-        >
-          <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
-          <span className="hidden sm:inline">Updated {timeAgo(new Date(lastUpdated))}</span>
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href="/shorts"
+            className="inline-flex items-center gap-2 rounded-xl gradient-primary px-3 py-2 text-sm font-semibold text-white shadow-card transition hover:shadow-glow"
+            title="Swipe through bite-sized news"
+          >
+            <Zap className="size-4" />
+            <span className="hidden sm:inline">Shorts</span>
+          </Link>
+          <button
+            onClick={refresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-60"
+            title="Auto-updates every 10 minutes"
+          >
+            <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Updated {timeAgo(new Date(lastUpdated))}</span>
+          </button>
+        </div>
       </div>
+
+      {/* Personalized AI briefing */}
+      <DailyBriefing />
 
       <TrendingRail articles={trending} />
 

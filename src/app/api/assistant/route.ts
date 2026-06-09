@@ -6,6 +6,7 @@ import { getAllArticles } from "@/lib/news/provider";
 import { liveSearch } from "@/lib/news/rss";
 import { rankTrending } from "@/lib/personalization";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { GeminiError, geminiChat } from "@/lib/ai";
 import type { Article, Language } from "@/types";
 
 export const runtime = "nodejs";
@@ -66,65 +67,13 @@ export const POST = route(async (req: NextRequest) => {
 
 // ── Gemini ──
 
-class GeminiError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-    this.name = "GeminiError";
-  }
-}
-
-// Tries the configured model, then known-good fallbacks (model names drift
-// between releases, so this keeps the chatbot working without redeploys).
-const FALLBACK_MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-flash-latest"];
-
 async function askGemini(key: string, messages: ChatMessage[], headlines: string): Promise<string> {
-  const primary = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-  const models = [primary, ...FALLBACK_MODELS.filter((m) => m !== primary)];
-  let lastErr: GeminiError = new GeminiError(0, "no models tried");
-
-  for (const model of models) {
-    try {
-      return await callGemini(model, key, messages, headlines);
-    } catch (e) {
-      const ge = e as GeminiError;
-      lastErr = ge;
-      // A bad key / auth error won't be fixed by another model — stop early.
-      if (ge.status === 401 || ge.status === 403 || (ge.status === 400 && /api[_ ]?key|not valid/i.test(ge.message))) {
-        throw ge;
-      }
-      // Otherwise (404 model-not-found, 429, 5xx) try the next model.
-    }
-  }
-  throw lastErr;
-}
-
-async function callGemini(
-  model: string,
-  key: string,
-  messages: ChatMessage[],
-  headlines: string,
-): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const systemText = headlines ? `${SYSTEM}\n\nCurrent top headlines:\n${headlines}` : SYSTEM;
   const contents = messages.map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
+    role: (m.role === "assistant" ? "model" : "user") as "model" | "user",
     parts: [{ text: m.content }],
   }));
-  const systemText = headlines ? `${SYSTEM}\n\nCurrent top headlines:\n${headlines}` : SYSTEM;
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemText }] },
-      contents,
-      generationConfig: { temperature: 0.6, maxOutputTokens: 700 },
-    }),
-  });
-  if (!res.ok) throw new GeminiError(res.status, await res.text().catch(() => ""));
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text).join("") ?? "";
-  if (!text.trim()) throw new GeminiError(0, "Empty Gemini response");
-  return text.trim();
+  return geminiChat(key, systemText, contents);
 }
 
 async function topHeadlines(lang: Language): Promise<string> {

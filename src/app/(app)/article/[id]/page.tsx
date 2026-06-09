@@ -19,6 +19,8 @@ import { getCategory } from "@/lib/news/categories";
 import { FactCheckBadge } from "@/components/ui/badge";
 import { NewsCard } from "@/components/NewsCard";
 import { ArticleImage } from "@/components/ArticleImage";
+import { AiTools } from "@/components/AiTools";
+import { ListenButton } from "@/components/ListenButton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUIStore, type TextSize } from "@/store/ui";
 import { track } from "@/lib/track";
@@ -155,6 +157,7 @@ export default function ArticlePage() {
           >
             <Share2 className="size-4" /> Share
           </button>
+          <ListenButton text={`${article.title}. ${article.summary}`} lang={article.language} />
           <a
             href={article.url}
             target="_blank"
@@ -216,6 +219,9 @@ export default function ArticlePage() {
           ))}
         </ul>
       </div>
+
+      {/* AI tools — ask the article + lenses */}
+      <AiTools article={article} />
 
       {/* Read mode tabs */}
       <div className="mt-6 flex gap-2">

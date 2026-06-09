@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Home,
+  Zap,
   Search,
   Bookmark,
   BarChart3,
@@ -21,6 +22,7 @@ import { AssistantWidget } from "./AssistantWidget";
 
 const NAV = [
   { href: "/feed", label: "Home", icon: Home },
+  { href: "/shorts", label: "Shorts", icon: Zap },
   { href: "/search", label: "Search", icon: Search },
   { href: "/library", label: "Library", icon: Bookmark },
   { href: "/settings", label: "Settings", icon: Settings },

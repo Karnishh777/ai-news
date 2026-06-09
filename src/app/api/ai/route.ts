@@ -10,7 +10,7 @@ import type { Language } from "@/types";
 
 export const runtime = "nodejs";
 
-type Mode = "explain" | "why" | "perspectives" | "ask" | "briefing";
+type Mode = "explain" | "why" | "perspectives" | "bias" | "ask" | "briefing" | "quiz";
 
 interface Body {
   mode: Mode;
@@ -62,6 +62,25 @@ export const POST = route(async (req: NextRequest) => {
       return ok({ ok: true, reply });
     }
 
+    if (mode === "quiz") {
+      const articles = await getAllArticles(lang);
+      const ranked = rankArticles(articles, {
+        prefs: user?.preferences ?? { interests: [], language: lang, newsLength: "short", notification: "both" },
+        interactions: [],
+      }).slice(0, 14);
+      const list = ranked.map((a) => `- ${a.title} (${a.source.name})`).join("\n");
+      const prompt =
+        `Recent headlines:\n${list}\n\n` +
+        'Create 4 fun multiple-choice questions testing whether the reader followed today\'s news. ' +
+        'Return ONLY a JSON array (no markdown, no prose). Each item: ' +
+        '{"q": string, "options": [4 short strings], "answer": <0-3 index of correct option>, "explain": short string}. ' +
+        "Make questions answerable from the headlines above; keep options plausible.";
+      const raw = await geminiChat(key, "You write concise, accurate news quizzes. Output strict JSON only.", userTurn(prompt), 900);
+      const quiz = parseQuiz(raw);
+      if (!quiz.length) return ok({ ok: false, reply: "Couldn't build a quiz right now — try again." });
+      return ok({ ok: true, quiz });
+    }
+
     // Article-grounded modes
     const a = body.article;
     if (!a?.title) return fail("Missing article", 422);
@@ -73,6 +92,9 @@ export const POST = route(async (req: NextRequest) => {
     else if (mode === "perspectives")
       instruction =
         "Give 2-3 balanced perspectives or angles on this story, each one line. If the article is opinion or one-sided, note that.";
+    else if (mode === "bias")
+      instruction =
+        "Assess tone and bias fairly in exactly 3 short lines:\n1) Sentiment: positive / neutral / negative\n2) Leaning: any political or one-sided framing, or 'appears balanced'\n3) Why: one short reason. Don't overclaim.";
     else if (mode === "ask") {
       const q = (body.question ?? "").trim();
       if (!q) return fail("Missing question", 422);
@@ -90,3 +112,26 @@ export const POST = route(async (req: NextRequest) => {
 export const GET = route(async () =>
   ok({ aiEnabled: hasServerKey() }),
 );
+
+interface QuizItem {
+  q: string;
+  options: string[];
+  answer: number;
+  explain?: string;
+}
+
+function parseQuiz(raw: string): QuizItem[] {
+  try {
+    const cleaned = raw.replace(/```json|```/gi, "").trim();
+    const start = cleaned.indexOf("[");
+    const end = cleaned.lastIndexOf("]");
+    if (start < 0 || end < 0) return [];
+    const arr = JSON.parse(cleaned.slice(start, end + 1)) as QuizItem[];
+    return arr
+      .filter((x) => x?.q && Array.isArray(x.options) && x.options.length >= 2 && typeof x.answer === "number")
+      .map((x) => ({ q: x.q, options: x.options.slice(0, 4), answer: Math.max(0, Math.min(3, x.answer)), explain: x.explain }))
+      .slice(0, 5);
+  } catch {
+    return [];
+  }
+}

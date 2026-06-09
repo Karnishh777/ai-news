@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Sparkles, Send, Loader2, Lightbulb, Scale, HelpCircle } from "lucide-react";
+import { Sparkles, Send, Loader2, Lightbulb, Scale, HelpCircle, Gauge } from "lucide-react";
 import type { Article } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -9,6 +9,7 @@ const LENSES = [
   { mode: "explain", label: "Explain simply", icon: Lightbulb },
   { mode: "why", label: "Why it matters", icon: HelpCircle },
   { mode: "perspectives", label: "Perspectives", icon: Scale },
+  { mode: "bias", label: "Bias & tone", icon: Gauge },
 ] as const;
 
 export function AiTools({ article }: { article: Article }) {

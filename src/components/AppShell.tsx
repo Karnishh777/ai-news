@@ -19,6 +19,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { NotificationsBell } from "./NotificationsBell";
 import { BreakingNewsToast } from "./BreakingNewsToast";
 import { AssistantWidget } from "./AssistantWidget";
+import { CommandPalette } from "./CommandPalette";
 
 const NAV = [
   { href: "/feed", label: "Home", icon: Home },
@@ -68,8 +69,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search topics, companies, people, events…"
-              className="h-10 w-full rounded-xl border border-border bg-background/60 pl-10 pr-4 text-sm focus-ring"
+              className="h-10 w-full rounded-xl border border-border bg-background/60 pl-10 pr-14 text-sm focus-ring"
             />
+            <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground lg:block">
+              ⌘K
+            </kbd>
           </form>
 
           <div className="ml-auto flex items-center gap-2">
@@ -163,6 +167,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <BreakingNewsToast />
       <AssistantWidget />
+      <CommandPalette />
     </div>
   );
 }

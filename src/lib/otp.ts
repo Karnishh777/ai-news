@@ -43,23 +43,24 @@ export async function sendOtpEmail(email: string, code: string): Promise<void> {
 }
 
 async function deliverViaResend(to: string, subject: string, code: string): Promise<void> {
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from: FROM, to, subject, html: otpEmailHtml(code) }),
-    });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      throw new Error(`Resend ${res.status}: ${detail}`);
-    }
-  } catch (err) {
-    // Don't hard-fail signup if email delivery hiccups; log and continue.
-    console.error("[otp] Resend delivery failed:", err);
-    throw err;
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: FROM,
+      to: [to],
+      subject,
+      html: otpEmailHtml(code),
+      text: `Your NewsFlow AI verification code is ${code}. It expires in 10 minutes. If you didn't request this, ignore this email.`,
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    console.error(`[otp] Resend ${res.status}: ${detail}`);
+    throw new Error(`Resend ${res.status}: ${detail}`);
   }
 }
 

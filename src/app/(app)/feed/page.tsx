@@ -7,6 +7,7 @@ import { NewsCard } from "@/components/NewsCard";
 import { TrendingRail } from "@/components/TrendingRail";
 import { TrendingTicker } from "@/components/TrendingTicker";
 import { DailyBriefing } from "@/components/DailyBriefing";
+import { NewsQuiz } from "@/components/NewsQuiz";
 import { CategoryChips } from "@/components/CategoryChips";
 import { NewsCardSkeleton } from "@/components/ui/skeleton";
 import { getCategory } from "@/lib/news/categories";
@@ -200,6 +201,9 @@ export default function FeedPage() {
           <p className="py-6 text-center text-sm text-muted-foreground">You&apos;re all caught up ✨</p>
         )}
       </section>
+
+      {/* AI news quiz */}
+      {active === "all" && <NewsQuiz />}
 
       {/* Category rails (only on the For You view) */}
       {active === "all" &&

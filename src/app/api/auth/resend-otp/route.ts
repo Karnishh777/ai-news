@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { route, ok, fail } from "@/lib/api";
 import { signOtpTicket, verifyOtpTicket } from "@/lib/jwt";
-import { exposeOtpInResponse, generateOtp, sendOtpEmail } from "@/lib/otp";
+import { exposeOtpInResponse, generateOtp, hasEmailProvider, sendOtpEmail } from "@/lib/otp";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -19,7 +19,13 @@ export const POST = route(async (req: NextRequest) => {
 
   const code = generateOtp();
   const ticket = await signOtpTicket({ ...pending, code });
-  await sendOtpEmail(pending.email, code);
+
+  try {
+    await sendOtpEmail(pending.email, code);
+  } catch (err) {
+    console.error("[resend] email delivery failed:", err);
+    if (hasEmailProvider()) return fail("We couldn't send the email. Please try again shortly.", 502);
+  }
 
   return ok({ ok: true, ticket, devCode: exposeOtpInResponse() ? code : undefined });
 });

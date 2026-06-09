@@ -4,7 +4,7 @@ import { signupSchema, fieldErrors } from "@/lib/validation";
 import { findUserByEmail } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { signOtpTicket } from "@/lib/jwt";
-import { exposeOtpInResponse, generateOtp, sendOtpEmail } from "@/lib/otp";
+import { exposeOtpInResponse, generateOtp, hasEmailProvider, sendOtpEmail } from "@/lib/otp";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { ensureSeeded } from "@/lib/seed-memory";
 
@@ -31,7 +31,15 @@ export const POST = route(async (req: NextRequest) => {
   // client holds, so verification works across serverless instances with no
   // shared store. (When a persistent driver is configured this still works.)
   const ticket = await signOtpTicket({ fullName, email, passwordHash, code });
-  await sendOtpEmail(email, code);
+
+  try {
+    await sendOtpEmail(email, code);
+  } catch (err) {
+    console.error("[signup] email delivery failed:", err);
+    // If a provider is configured but delivery failed, fail clearly rather
+    // than leaving the user without a code.
+    if (hasEmailProvider()) return fail("We couldn't send the verification email. Please try again shortly.", 502);
+  }
 
   return ok({
     ok: true,
